@@ -1,0 +1,13 @@
+{
+  "name": "emailserver",
+  "version": "1.0.0",
+  "description": "NodeJS server in order to send out emails",
+  "scripts": {
+    "ng": "ng",
+    "test": "ng test",
+    "lint": "ng lint"
+  },
+  "dependencies": {
+    "nodemailer": "^6.4.14"
+  }
+}
