@@ -3,129 +3,122 @@ const express = require('express');
 var bodyParser = require('body-parser');
 
 var config = require('./config.json');
-var signiture = require('./signiture.html')
 const app = express();
 const port = 8080;
+app.use(function (req, resp, next) {
+    resp.header("Access-Control-Allow-Origin", "*");
+    resp.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Client-Id");
+    next();
+})
+app.options('*', function (req, res) { res.sendStatus(200); });
 app.use(bodyParser.json());
 app.listen(port);
 var transport = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: config.port,
-  secure: true,
-  auth: {
-    user: config.user,
-    pass: config.pass
-  }
+    host: "smtp.gmail.com",
+    port: config.port,
+    secure: true,
+    auth: {
+        user: config.user,
+        pass: config.pass
+    }
 });
 
 app.post('/sendEmail', (request, response) => {
-  var clientId = request.header('Client-Id');
-  var body = request.body;
+    var clientId = request.header('Client-Id');
+    var body = request.body;
 
-  try {
-    if (!validateCredentials(clientId, response)) { return; };
-  } catch (error) {
-    throw new CustomError(403, "403 Forbidden", "Something went wrong with validating your credentials");
-  }
-  if (!validateBody(body, response)) { return; };
+    try {
+        if (!validateCredentials(clientId, response)) { return; };
+    } catch (error) {
+        throw new CustomError(403, "403 Forbidden", "Something went wrong with validating your credentials");
+    }
+    if (!validateBody(body, response)) { return; };
 
-  console.log('Validations all passed')
+    console.log('Validations all passed')
 
-  buildHtmlMessage(body);
-  message.html = buildHtmlMessage(body);
+    buildHtmlMessage(body);
+    message.html = buildHtmlMessage(body);
 
-  sendMail(message, response);
+    sendMail(message, response);
 });
 
 function sendMail(input, response) {
-  transport.sendMail(input, function (err, info) {
-    if (err) {
-      console.log(err)
-      response.status(500).send("Something went wrong: ", err);
-      throw new CustomError(500, "Internal Server Error", "Something went wrong: " + err);
-    } else {
-      response.status(200).send('Email sent!');
-    }
-  });
+    transport.sendMail(input, function (err, info) {
+        if (err) {
+            console.log(err)
+            response.status(500).send("Something went wrong: ", err);
+            throw new CustomError(500, "Internal Server Error", "Something went wrong: " + err);
+        } else {
+            response.json(200, { response: 'Email sent!' });
+        }
+    });
 }
 
 function decryptValueHex(value) {
-  return Buffer.from(value, 'hex').toString('ascii');
+    return Buffer.from(value, 'hex').toString('ascii');
 }
 
 function decryptValueBase(value) {
-  return Buffer.from(value, 'base64').toString('ascii');
+    return Buffer.from(value, 'base64').toString('ascii');
 }
 
 function validateCredentials(clientId, response) {
-  console.log('Validating credentials')
-  if (!clientId) {
-    response.status(401).send('No value found for header: Client-Id');
-    return false;
-  }
-  var firstDecrypted = decryptValueHex(clientId);
-  var secondDecrypted = decryptValueBase(firstDecrypted);
-  if (secondDecrypted !== config.pass) {
-    response.status(401).send('Unauthorised: Invalid client Id');
-    return false;
-  } return true;
+    console.log('Validating credentials')
+    if (!clientId) {
+        response.status(401).send('No value found for header: Client-Id');
+        return false;
+    }
+    var firstDecrypted = decryptValueHex(clientId);
+    var secondDecrypted = decryptValueBase(firstDecrypted);
+    if (secondDecrypted !== config.pass) {
+        response.status(401).send('Unauthorised: Invalid client Id');
+        return false;
+    } return true;
 }
 
 function validateBody(body, response) {
-  console.log('Validating body')
-  EMAIL_REGEX = /^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$/;
-  MESSAGE_REGEX = /^[a-zA-Z-0-9.,\s_$£&€'"@\)\(+\/]+$/;
-  NAME_REGEX = /^[ a-zA-Z-']*$/
+    console.log('Validating body')
+    EMAIL_REGEX = /^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$/;
+    MESSAGE_REGEX = /^[a-zA-Z-0-9.,\s_$£&€'"@\)\(+\/]+$/;
+    NAME_REGEX = /^[ a-zA-Z-']*$/
 
-  if (body.from === '') {
-    response.status(400).send('The return email address cannot be empty');
-    return false;
-  } else if (body.text === '') {
-    response.status(400).send('The message cannot be empty');
-    return false;
-  } else if (body.subject === '') {
-    response.status(400).send('The subject cannot be empty');
-    return false;
-  }
+    if (body.from === '') {
+        response.status(400).send('The return email address cannot be empty');
+        return false;
+    } else if (body.text === '') {
+        response.status(400).send('The message cannot be empty');
+        return false;
+    } else if (body.subject === '') {
+        response.status(400).send('The subject cannot be empty');
+        return false;
+    }
 
-  if (!EMAIL_REGEX.test(body.from)) {
-    response.status(400).send('The return email address does not match the standard format');
-    return false;
-  } else if (!MESSAGE_REGEX.test(body.text)) {
-    response.status(400).send('The message contains forbidden characters');
-    return false;
-  } else if (!MESSAGE_REGEX.test(body.subject)) {
-    response.status(400).send('The subject contains forbidden characters');
-    return false;
-  } else if (!NAME_REGEX.test(body.name)) {
-    response.status(400).send('The name contains forbidden characters');
-    return false;
-  } else {
-    return true;
-  }
+    if (!EMAIL_REGEX.test(body.from)) {
+        response.status(400).send('The return email address does not match the standard format');
+        return false;
+    } else if (!MESSAGE_REGEX.test(body.text)) {
+        response.status(400).send('The message contains forbidden characters');
+        return false;
+    } else if (!MESSAGE_REGEX.test(body.subject)) {
+        response.status(400).send('The subject contains forbidden characters');
+        return false;
+    } else if (!NAME_REGEX.test(body.name)) {
+        response.status(400).send('The name contains forbidden characters');
+        return false;
+    } else {
+        return true;
+    }
 }
 
 function buildHtmlMessage(body) {
-  return `
-  <!doctype html>
-  <html>
-      <head>
-          <meta charset="utf-8">
-          <style> 
-            span {
-              font-style: italic; 
-              font-weight: bold;
-            }
-            </stlye>
-      </head>
-      <body>
-          <h2>An request has been submitted for more information from <span>techyBoy<span></h2>
+    return `
+          <h2>An request has been submitted for more information from <span style="font-style: italic; font-weight=bold">techyBoy<span></h2>
           <ul>
-              <li>From: <span>` + body.from + `</span></li>
-              <li>Name: <span>` + body.name + `</span></li>
-              <li>Subject: <span>` + body.subject + `</span></li>
+              <li>From: <span style="font-style: italic; font-weight=bold">` + body.from + `</span></li>
+              <li>Name: <span style="font-style: italic; font-weight=bold">` + body.name + `</span></li>
+              <li>Subject: <span style="font-style: italic; font-weight=bold">` + body.subject + `</span></li>
               <li>Message:
-                <span>` + body.text + `</span></li>
+                <span style="font-style: italic; font-weight=bold">` + body.text + `</span></li>
           </ul>
           <table id="zs-output-sig" border="0" cellpadding="0" cellspacing="0"
           style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px;border-spacing:0px;margin:0px;border-collapse:collapse; width:425px;">
@@ -339,25 +332,23 @@ function buildHtmlMessage(body) {
               </tr>
           </tbody>
       </table>
-      </body>
-  </html>
   `;
 }
 
 var message = {
-  from: config.user,
-  to: config.sendingEmail,
-  subject: config.defaultSubject + new Date().toDateString(),
-  html: '',
-  amp: ''
+    from: config.user,
+    to: config.sendingEmail,
+    subject: config.defaultSubject + new Date().toDateString(),
+    html: '',
+    amp: ''
 };
 
 
 function CustomError(status, errorType, msg) {
-  Error.call(this);
+    Error.call(this);
 
-  this.message = msg;
-  this.status = status;
-  this.name = errorType;
+    this.message = msg;
+    this.status = status;
+    this.name = errorType;
 };
 CustomError.prototype.__proto__ = Error.prototype;
